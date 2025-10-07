@@ -1,5 +1,76 @@
 <!DOCTYPE html><html lang="zh-CN">
 <head>
+  <!-- Firebase 兼容版 CDN（适配我们现有写法） -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script>
+  // ⚠️ 把下面的配置换成你刚复制的 firebaseConfig
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "XXXXXXXXXXXX",
+    appId: "1:XXXXXXXXXXXX:web:XXXXXXXXXXXX"
+  };
+
+  // 初始化
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // 一个共享文档位点：我们俩共用同一条记录（你可以改成自己的ID）
+  const DOC = db.collection("love-home").doc("shared");
+
+  // 简单的合并写工具：把本地状态写回云端
+  async function mergeDoc(patch){
+    await DOC.set(patch, { merge: true });
+  }
+
+  // 首次创建文档（如果不存在）
+  DOC.get().then(snap=>{
+    if(!snap.exists){
+      mergeDoc({
+        notes: "",
+        todos: [],
+        marks: [],
+        countdown: null,
+        updatedAt: Date.now()
+      });
+    }
+  });
+
+  // 实时订阅：云端变化→自动更新到页面（覆盖本地显示）
+  DOC.onSnapshot(snap => {
+    const data = snap.data();
+    if(!data) return;
+
+    // 留言板
+    if(typeof data.notes === "string"){
+      const el = document.getElementById('notes');
+      if(el && el !== document.activeElement){ el.value = data.notes; }
+    }
+
+    // 待办
+    if(Array.isArray(data.todos)){
+      try { window.todos = data.todos; } catch(e){}
+      if(typeof render === "function"){ render(); }
+    }
+
+    // 打卡
+    if(Array.isArray(data.marks)){
+      try { window.marks = data.marks; } catch(e){}
+      if(typeof showMarks === "function"){ showMarks(); }
+    }
+
+    // 倒计时
+    if(data.countdown){
+      const v = data.countdown; // ISO字符串
+      const dt = document.getElementById('dt');
+      if(dt && !dt.value) dt.value = v.replace('Z',''); // 简单回显
+    }
+  });
+</script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>顾承×鱼宝｜情侣自律小家</title>
@@ -116,7 +187,7 @@
   // —— 留言板（本地持久化） ——
   const notesEl=document.getElementById('notes');
   notesEl.value=localStorage.getItem('notes')||'';
-  function saveNotes(){localStorage.setItem('notes',notesEl.value);const hint=document.getElementById('saveHint');hint.textContent='已保存';setTimeout(()=>hint.textContent='',1200)}
+  function saveNotes(){localStorage.setItem('notes',notesEl.value);mergeDoc({ notes: notesEl.value, updatedAt: Date.now() }); const hint=document.getElementById('saveHint');hint.textContent='已保存';setTimeout(()=>hint.textContent='',1200)}
 
   // —— 番茄钟 + 监控 ——
   let t=0, total=25*60, ticking=null, focusing=false, hiddenAt=0;
@@ -132,20 +203,21 @@
   const listEl=document.getElementById('todoList');
   let todos=JSON.parse(localStorage.getItem('todos')||'[]');
   function render(){listEl.innerHTML='';todos.forEach((it,idx)=>{const li=document.createElement('li');li.innerHTML=`<span ${it.done?'class="muted"':''}>${it.text}</span>`;const btn=document.createElement('button');btn.className='btn btn-plain';btn.textContent=it.done?'撤回':'完成';btn.onclick=()=>{todos[idx].done=!todos[idx].done;saveTodos()};li.appendChild(btn);listEl.appendChild(li)})}
-  function saveTodos(){localStorage.setItem('todos',JSON.stringify(todos));render()}
+  function saveTodos(){localStorage.setItem('todos',JSON.stringify(todos));mergeDoc({ todos, updatedAt: Date.now() });render()}
   function addTodo(){const inp=document.getElementById('todoInput');const v=inp.value.trim();if(!v) return;todos.push({text:v,done:false});inp.value='';saveTodos()}
   render();
 
   // —— 日历打卡（存日期） ——
   const daysEl=document.getElementById('days');
   let marks=JSON.parse(localStorage.getItem('marks')||'[]');
-  function markDay(){const val=document.getElementById('datePick').value;if(!val) return; if(!marks.includes(val)) marks.push(val); localStorage.setItem('marks',JSON.stringify(marks));showMarks()}
+  function markDay(){const val=document.getElementById('datePick').value;if(!val) return; if(!marks.includes(val)) marks.push(val); localStorage.setItem('marks',JSON.stringify(marks));mergeDoc({ marks, updatedAt: Date.now() });showMarks()}
   function showMarks(){daysEl.textContent = marks.length? '已打卡：'+marks.join('、') : '尚无打卡'}
   showMarks();
 
   // —— 倒计时 ——
   let target=null,downTimer=null;const leftEl=document.getElementById('left'),doneEl=document.getElementById('done');
-  function setTarget(){const v=document.getElementById('dt').value;if(!v) return;target=new Date(v);doneEl.style.display='none';downTimer&&clearInterval(downTimer);downTimer=setInterval(()=>{const diff=target-new Date();if(diff<=0){leftEl.textContent='00:00:00';doneEl.style.display='block';navigator.vibrate&&navigator.vibrate([90,90,120]);clearInterval(downTimer)}else{const s=Math.floor(diff/1000);const h=Math.floor(s/3600).toString().padStart(2,'0');const m=Math.floor(s%3600/60).toString().padStart(2,'0');const ss=(s%60).toString().padStart(2,'0');leftEl.textContent=`${h}:${m}:${ss}`}},1000)}
+  function setTarget(){const v=document.getElementById('dt').value;if(!v) return;target=new Date(v);mergeDoc({ countdown: new Date(v).toISOString(), updatedAt: Date.now() }); doneEl.style.display='none';downTimer&&clearInterval(downTimer);downTimer=setInterval(()=>{const diff=target-new Date();if(diff<=0){leftEl.textContent='00:00:00';doneEl.style.display='block';navigator.vibrate&&navigator.vibrate([90,90,120]);clearInterval(downTimer)}else{const s=Math.floor(diff/1000);const h=Math.floor(s/3600).toString().padStart(2,'0');const m=Math.floor(s%3600/60).toString().padStart(2,'0');const ss=(s%60).toString().padStart(2,'0');leftEl.textContent=`${h}:${m}:${ss}`}},1000)}
 </script></body>
 
 </html>
+
