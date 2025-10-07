@@ -147,4 +147,5 @@
   let target=null,downTimer=null;const leftEl=document.getElementById('left'),doneEl=document.getElementById('done');
   function setTarget(){const v=document.getElementById('dt').value;if(!v) return;target=new Date(v);doneEl.style.display='none';downTimer&&clearInterval(downTimer);downTimer=setInterval(()=>{const diff=target-new Date();if(diff<=0){leftEl.textContent='00:00:00';doneEl.style.display='block';navigator.vibrate&&navigator.vibrate([90,90,120]);clearInterval(downTimer)}else{const s=Math.floor(diff/1000);const h=Math.floor(s/3600).toString().padStart(2,'0');const m=Math.floor(s%3600/60).toString().padStart(2,'0');const ss=(s%60).toString().padStart(2,'0');leftEl.textContent=`${h}:${m}:${ss}`}},1000)}
 </script></body>
+
 </html>
