@@ -120,9 +120,10 @@
       <b>私密留言板</b>
       <div class="muted" style="font-size:12px">写给彼此的小纸条（仅保存在你手机）</div>
       <textarea id="notes" rows="4" placeholder="想我就写点什么～"></textarea>
+      <button id="saveBtn" onclick="saveNotes()">保存</button>
+<div id="saveHint" style="color:#999;margin-top:4px;"></div>
       <div style="margin-top:8px" class="row">
-        <button class="btn btn-pink" onclick="saveNotes()">保存</button>
-        <span id="saveHint" class="muted"></span>
+       <span id="saveHint" class="muted"></span>
       </div>
     </div>
   </section>  <!-- 自律学习 -->  <section class="card" data-page="study" hidden>
@@ -220,5 +221,6 @@
 </script></body>
 
 </html>
+
 
 
