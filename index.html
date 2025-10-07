@@ -71,6 +71,203 @@
     }
   });
 </script>
+  <script>
+// ========== 共享留言墙：数据结构 ==========
+// 我们沿用已有 DOC（love-home / shared）
+// 在其中保存一个字段 messages: [{author, text, ts}, ...]
+
+// 渲染函数
+function renderWall(list) {
+  const box = document.getElementById('wallList');
+  if (!box) return;
+  if (!Array.isArray(list) || list.length === 0) {
+    box.innerHTML = '<div class="muted" style="padding:10px">还没有消息，先来一句开场白？</div>';
+    return;
+    }
+  box.innerHTML = '';
+  list
+    .slice() // 复制
+    .sort((a,b)=> (a.ts||0) - (b.ts||0)) // 时间升序
+    .forEach((m)=>{
+      const row = document.createElement('div');
+      row.style.padding = '10px';
+      row.style.borderBottom = '1px dashed #f1e7f7';
+      const when = m.ts ? new Date(m.ts).toLocaleString() : '';
+      const who  = m.author || '佚名';
+      const text = (m.text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+      row.innerHTML = `
+        <div style="font-size:13px" class="muted">${when} · ${who}</div>
+        <div style="margin-top:4px">${text}</div>
+      `;
+      box.appendChild(row);
+    });
+}
+
+// 发送一条
+async function pushWall() {
+  const inp = document.getElementById('wallInput');
+  if (!inp) return;
+  const v = (inp.value || '').trim();
+  if (!v) return;
+
+  // 读取当前 messages，追加一条再写回（原子合并）
+  const snap = await DOC.get();
+  const data = snap.exists ? snap.data() : {};
+  const msgs = Array.isArray(data.messages) ? data.messages.slice() : [];
+
+  msgs.push({
+    author: '鱼宝',        // 你也可以改成 prompt 或你的昵称
+    text: v,
+    ts: Date.now()
+  });
+
+  await DOC.set({ messages: msgs, updatedAt: Date.now() }, { merge: true });
+  try { localStorage.setItem('messages', JSON.stringify(msgs)); } catch(e){}
+  inp.value = '';
+  renderWall(msgs);
+}
+
+// 把云端变化实时回填到留言墙
+// 在你现有的 DOC.onSnapshot(...) 里，追加以下片段：
+// （如果你已写过 onSnapshot，就把这段放进回调里）
+if (typeof DOC !== 'undefined') {
+  DOC.onSnapshot(snap=>{
+    const d = snap.data() || {};
+    if (Array.isArray(d.messages)) {
+      try { localStorage.setItem('messages', JSON.stringify(d.messages)); } catch(e){}
+      renderWall(d.messages);
+    }
+  });
+}
+
+// 页面初次加载时，用本地缓存先渲染一遍，避免白屏
+document.addEventListener('DOMContentLoaded', ()=>{
+  try {
+    const cached = JSON.parse(localStorage.getItem('messages') || '[]');
+    renderWall(cached);
+  } catch(e){ renderWall([]); }
+});
+</script>
+  <script>
+// ========== 奖惩台账的数据结构（存进 DOC：love-home/shared） ==========
+// ledger = { history: [{type:'reward'|'punish', title, note, ts}], totalKiss: number, totalPunish: number }
+
+function ensureLedgerShape(d){
+  if(!d.ledger) d.ledger = { history: [], totalKiss: 0, totalPunish: 0 };
+  d.ledger.history ||= [];
+  d.ledger.totalKiss  = Number(d.ledger.totalKiss||0);
+  d.ledger.totalPunish= Number(d.ledger.totalPunish||0);
+  return d;
+}
+
+// 渲染
+function renderLedger(ledger){
+  ledger = ensureLedgerShape({ledger}).ledger;
+  const list = document.getElementById('ledgerList');
+  const tk   = document.getElementById('totalKiss');
+  const tp   = document.getElementById('totalPunish');
+  if(tk) tk.textContent = ledger.totalKiss;
+  if(tp) tp.textContent = ledger.totalPunish;
+
+  if(!list) return;
+  if(ledger.history.length === 0){
+    list.innerHTML = '<div class="muted" style="padding:10px">还没有记录，开始一次专注试试？</div>';
+    return;
+  }
+  list.innerHTML = '';
+  ledger.history
+    .slice()
+    .sort((a,b)=> (b.ts||0)-(a.ts||0)) // 新的在上
+    .forEach(item=>{
+      const row = document.createElement('div');
+      row.style.padding = '10px';
+      row.style.borderBottom = '1px dashed #f1e7f7';
+      const when = new Date(item.ts||Date.now()).toLocaleString();
+      const tag  = item.type === 'reward' ? '✅ 奖励' : '❌ 惩罚';
+      row.innerHTML = `
+        <div class="muted" style="font-size:12px">${when} · ${tag}</div>
+        <div style="margin-top:4px"><b>${item.title||''}</b> ${item.note? '— '+item.note : ''}</div>
+      `;
+      list.appendChild(row);
+    });
+}
+
+// 记一条奖励
+async function addReward(title, note){
+  const snap = await DOC.get(); const d = ensureLedgerShape(snap.exists ? snap.data() : {});
+  d.ledger.history.push({ type:'reward', title, note, ts: Date.now() });
+  d.ledger.totalKiss += 1;
+  await mergeDoc({ ledger: d.ledger, updatedAt: Date.now() });
+  try{ localStorage.setItem('ledger', JSON.stringify(d.ledger)); }catch(e){}
+  renderLedger(d.ledger);
+}
+
+// 记一条惩罚
+async function addPunish(title, note){
+  const snap = await DOC.get(); const d = ensureLedgerShape(snap.exists ? snap.data() : {});
+  d.ledger.history.push({ type:'punish', title, note, ts: Date.now() });
+  d.ledger.totalPunish += 1;
+  await mergeDoc({ ledger: d.ledger, updatedAt: Date.now() });
+  try{ localStorage.setItem('ledger', JSON.stringify(d.ledger)); }catch(e){}
+  renderLedger(d.ledger);
+}
+
+// 兑换一张亲亲券（总数 -1，并记履历）
+async function redeemKiss(){
+  const snap = await DOC.get(); const d = ensureLedgerShape(snap.exists ? snap.data() : {});
+  if(d.ledger.totalKiss <= 0) { alert('还没有亲亲券哦～先完成一个番茄再来兑换'); return; }
+  d.ledger.totalKiss -= 1;
+  d.ledger.history.push({ type:'reward', title:'使用亲亲券', note:'已兑换一枚 💋', ts: Date.now() });
+  await mergeDoc({ ledger: d.ledger, updatedAt: Date.now() });
+  try{ localStorage.setItem('ledger', JSON.stringify(d.ledger)); }catch(e){}
+  renderLedger(d.ledger);
+}
+
+// 完成一项惩罚（总数 -1，并记履历）
+async function clearPunish(){
+  const snap = await DOC.get(); const d = ensureLedgerShape(snap.exists ? snap.data() : {});
+  if(d.ledger.totalPunish <= 0) { alert('今天没有待完成的惩罚～'); return; }
+  d.ledger.totalPunish -= 1;
+  d.ledger.history.push({ type:'punish', title:'完成惩罚', note:'执行一项自选惩罚 ✅', ts: Date.now() });
+  await mergeDoc({ ledger: d.ledger, updatedAt: Date.now() });
+  try{ localStorage.setItem('ledger', JSON.stringify(d.ledger)); }catch(e){}
+  renderLedger(d.ledger);
+}
+
+// 云端 → 回填（把这段加到你已有 DOC.onSnapshot 回调里，或紧跟其后）
+DOC.onSnapshot(snap=>{
+  const d = snap.data() || {};
+  if(d.ledger){
+    try{ localStorage.setItem('ledger', JSON.stringify(d.ledger)); }catch(e){}
+    renderLedger(d.ledger);
+  }
+});
+
+// 页面初载：用本地缓存先渲染一次
+document.addEventListener('DOMContentLoaded', ()=>{
+  try{
+    const cached = JSON.parse(localStorage.getItem('ledger')||'{}');
+    if(cached) renderLedger(cached);
+  }catch(e){ renderLedger({ history:[], totalKiss:0, totalPunish:0 }); }
+});
+    // 记录离开时间
+let _leaveStart = 0;
+
+document.addEventListener('visibilitychange', ()=>{
+  if (document.hidden) {
+    _leaveStart = Date.now();
+  } else {
+    const away = (Date.now() - _leaveStart) / 1000;
+    if (away > 10 && typeof focusing !== 'undefined' && focusing) {
+      // 显示惩罚提示
+      document.getElementById('warn').style.display = 'block';
+      // ★ 自动惩罚（云同步）
+      addPunish('学习溜号', '离开页面 > 10 秒');
+    }
+  }
+});
+</script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>顾承×鱼宝｜情侣自律小家</title>
@@ -126,6 +323,20 @@
        <span id="saveHint" class="muted"></span>
       </div>
     </div>
+    <!-- 共享留言墙（云同步） -->
+<div class="card">
+  <b>共享留言墙（我们俩都能看到）</b>
+  <div id="wallList" class="list" style="max-height:220px; overflow:auto; margin:8px 0; border:1px dashed #f1e7f7; border-radius:10px;"></div>
+
+  <div class="row" style="margin-top:8px">
+    <input id="wallInput" placeholder="对彼此说点什么…"/>
+    <button class="btn btn-pink" onclick="pushWall()">发送</button>
+  </div>
+
+  <div class="muted" style="font-size:12px;margin-top:6px">
+    提示：这块内容云端共享，任意设备打开同一网址都会看到
+  </div>
+</div>
   </section>  <!-- 自律学习 -->  <section class="card" data-page="study" hidden>
     <b>专注计时（番茄钟）</b>
     <div class="grid2" style="margin:8px 0">
@@ -153,7 +364,23 @@
   </div>
   <ul id="todoList" class="list"></ul>
 </div>
+<!-- 奖励 / 惩罚清单（云同步） -->
+<div class="card">
+  <b>奖励 / 惩罚清单</b>
+  <div class="muted" style="font-size:12px">番茄完成自动记“亲亲券×1”；学习中溜号记“惩罚×1”</div>
 
+  <div id="ledgerTotals" class="row" style="margin:8px 0">
+    <span class="pill">亲亲券：<b id="totalKiss">0</b></span>
+    <span class="pill">惩罚：<b id="totalPunish">0</b></span>
+  </div>
+
+  <div id="ledgerList" class="list" style="max-height:220px; overflow:auto; border:1px dashed #f1e7f7; border-radius:10px"></div>
+
+  <div class="row" style="margin-top:8px">
+    <button class="btn btn-pink" onclick="redeemKiss()">兑换一张亲亲券 💋</button>
+    <button class="btn btn-plain" onclick="clearPunish()">完成一项惩罚 ✅</button>
+  </div>
+    </div>
   </section>  <!-- 日历打卡（简版） -->  <section class="card" data-page="calendar" hidden>
     <b>选择日期并打卡</b>
     <div class="row" style="margin:8px 0">
@@ -221,6 +448,7 @@
 </script></body>
 
 </html>
+
 
 
 
