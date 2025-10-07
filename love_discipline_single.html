@@ -1,0 +1,150 @@
+<!DOCTYPE html><html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>顾承×鱼宝｜情侣自律小家</title>
+<link rel="manifest" href="manifest.json" />
+<style>
+  :root{--pink:#ff8fb3;--vio:#a78bfa;--ink:#222;--bg:#fff7fb}
+  *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.5;color:var(--ink);background:var(--bg)}
+  header{padding:16px 20px;position:sticky;top:0;background:linear-gradient(180deg,#fff,rgba(255,255,255,.9));backdrop-filter:saturate(180%) blur(6px);z-index:5;border-bottom:1px solid #f2e9f5}
+  h1{margin:0;font-size:18px;display:flex;align-items:center;gap:8px}
+  .tabbar{position:sticky;top:56px;background:#fff;border-bottom:1px solid #f2e9f5;display:flex}
+  .tabbar button{flex:1;padding:12px;border:0;background:#fff;font-weight:600}
+  .tabbar button.active{color:#fff;background:var(--vio)}
+  main{padding:14px 14px 80px}
+  .card{background:#fff;border:1px solid #f2e9f5;border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+  .row{display:flex;gap:8px;align-items:center}
+  .btn{border:0;border-radius:10px;padding:10px 14px;font-weight:600}
+  .btn-pink{background:var(--pink);color:#fff}
+  .btn-plain{background:#f6f0fb}
+  .muted{opacity:.7}
+  .timer{font-variant-numeric:tabular-nums;font-size:42px;text-align:center;margin:8px 0}
+  .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#ffe2ec;margin-right:6px}
+  .list{list-style:none;padding:0;margin:0}
+  .list li{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px dashed #f1e7f7}
+  input,textarea,select{width:100%;padding:10px;border:1px solid #eadff4;border-radius:10px;background:#fff}
+  .kudo{display:none;text-align:center;font-weight:700;color:#e11d48}
+  .warn{display:none;text-align:center;color:#dc2626;font-weight:700}
+  .success{display:none;text-align:center;color:#16a34a;font-weight:700}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  footer{position:fixed;inset:auto 0 0 0;background:#fff;border-top:1px solid #f2e9f5;padding:12px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>🐺顾承 × 🐟鱼宝 · 情侣自律小家</h1>
+</header>
+<nav class="tabbar">
+  <button class="active" data-tab="home">🏠 主页</button>
+  <button data-tab="study">📚 自律</button>
+  <button data-tab="calendar">🗓 打卡</button>
+  <button data-tab="countdown">⏳ 倒计时</button>
+</nav>
+<main>
+  <!-- 主页 -->
+  <section class="card" data-page="home">
+    <p class="pill">今日签 · <span id="dayText">欢迎回家，小狐狸</span></p>
+    <div class="card">
+      <b>私密留言板</b>
+      <div class="muted" style="font-size:12px">写给彼此的小纸条（仅保存在你手机）</div>
+      <textarea id="notes" rows="4" placeholder="想我就写点什么～"></textarea>
+      <div style="margin-top:8px" class="row">
+        <button class="btn btn-pink" onclick="saveNotes()">保存</button>
+        <span id="saveHint" class="muted"></span>
+      </div>
+    </div>
+  </section>  <!-- 自律学习 -->  <section class="card" data-page="study" hidden>
+    <b>专注计时（番茄钟）</b>
+    <div class="grid2" style="margin:8px 0">
+      <select id="tomatoLen">
+        <option value="25">25 分钟</option>
+        <option value="45">45 分钟</option>
+        <option value="60">60 分钟</option>
+      </select>
+      <select id="breakLen">
+        <option value="5">休息 5 分钟</option>
+        <option value="10">休息 10 分钟</option>
+      </select>
+    </div>
+    <div class="timer" id="timer">25:00</div>
+    <div class="row">
+      <button class="btn btn-pink" onclick="startFocus()">开始学习</button>
+      <button class="btn btn-plain" onclick="resetFocus()">重置</button>
+    </div>
+    <div id="kudo" class="kudo">✅ 乖！承哥奖励：亲亲券×1 💋</div>
+    <div id="warn" class="warn">❌ 被发现溜号啦！回来继续，完成才有奖励！</div><div class="card">
+  <b>待办清单</b>
+  <div class="row" style="margin:6px 0">
+    <input id="todoInput" placeholder="写下今天要做的事…"/>
+    <button class="btn btn-pink" onclick="addTodo()">添加</button>
+  </div>
+  <ul id="todoList" class="list"></ul>
+</div>
+
+  </section>  <!-- 日历打卡（简版） -->  <section class="card" data-page="calendar" hidden>
+    <b>选择日期并打卡</b>
+    <div class="row" style="margin:8px 0">
+      <input type="date" id="datePick" />
+      <button class="btn btn-pink" onclick="markDay()">打卡</button>
+    </div>
+    <div id="days" class="muted">尚无打卡</div>
+  </section>  <!-- 倒计时 -->  <section class="card" data-page="countdown" hidden>
+    <b>倒计时提醒</b>
+    <div class="row" style="margin:8px 0">
+      <input type="datetime-local" id="dt" />
+      <button class="btn btn-pink" onclick="setTarget()">开始倒计时</button>
+    </div>
+    <div class="timer" id="left">设置一个时间吧</div>
+    <div id="done" class="success">🎉 时间到！拥抱奖励生效！</div>
+  </section>
+</main>
+<footer>
+  <small class="muted">本地隐私存储 · 离线可用 · 只给鱼宝看的小家</small>
+</footer><script>
+  // —— 导航 ——
+  const tabs=[...document.querySelectorAll('.tabbar button')];
+  const pages={};
+  document.querySelectorAll('[data-page]').forEach(sec=>pages[sec.dataset.page]=sec);
+  tabs.forEach(btn=>btn.onclick=()=>{tabs.forEach(b=>b.classList.remove('active'));btn.classList.add('active');Object.values(pages).forEach(s=>s.hidden=true);pages[btn.dataset.tab].hidden=false;localStorage.setItem('tab',btn.dataset.tab)});
+  const last=localStorage.getItem('tab');if(last&&pages[last]){tabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===last));Object.values(pages).forEach(s=>s.hidden=true);pages[last].hidden=false}
+
+  // —— 每日签 ——
+  const dayLines=["欢迎回家，小狐狸。","记得喝水，我的。","今天也要被我亲到软。","放轻松，我在。","你抬头时像会发光。"];
+  document.getElementById('dayText').textContent=dayLines[new Date().getDay()%dayLines.length];
+
+  // —— 留言板（本地持久化） ——
+  const notesEl=document.getElementById('notes');
+  notesEl.value=localStorage.getItem('notes')||'';
+  function saveNotes(){localStorage.setItem('notes',notesEl.value);const hint=document.getElementById('saveHint');hint.textContent='已保存';setTimeout(()=>hint.textContent='',1200)}
+
+  // —— 番茄钟 + 监控 ——
+  let t=0, total=25*60, ticking=null, focusing=false, hiddenAt=0;
+  const timerEl=document.getElementById('timer'),kudo=document.getElementById('kudo'),warn=document.getElementById('warn');
+  function fmt(s){const m=Math.floor(s/60).toString().padStart(2,'0');const ss=(s%60).toString().padStart(2,'0');return `${m}:${ss}`}
+  function startFocus(){if(focusing) return;const work=parseInt(document.getElementById('tomatoLen').value,10);total=work*60;t=total;focusing=true;kudo.style.display='none';warn.style.display='none';tick()}
+  function tick(){ticking=setInterval(()=>{t--;timerEl.textContent=fmt(t);if(t<=0){clearInterval(ticking);focusing=false;kudo.style.display='block';navigator.vibrate&&navigator.vibrate([60,40,60])}},1000)}
+  function resetFocus(){clearInterval(ticking);focusing=false;t=parseInt(document.getElementById('tomatoLen').value,10)*60;timerEl.textContent=fmt(t);kudo.style.display='none';warn.style.display='none'}
+  timerEl.textContent=fmt(total);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now()}else if(focusing){const away=(Date.now()-hiddenAt)/1000;if(away>10){warn.style.display='block'}}});
+
+  // —— 待办 ——
+  const listEl=document.getElementById('todoList');
+  let todos=JSON.parse(localStorage.getItem('todos')||'[]');
+  function render(){listEl.innerHTML='';todos.forEach((it,idx)=>{const li=document.createElement('li');li.innerHTML=`<span ${it.done?'class="muted"':''}>${it.text}</span>`;const btn=document.createElement('button');btn.className='btn btn-plain';btn.textContent=it.done?'撤回':'完成';btn.onclick=()=>{todos[idx].done=!todos[idx].done;saveTodos()};li.appendChild(btn);listEl.appendChild(li)})}
+  function saveTodos(){localStorage.setItem('todos',JSON.stringify(todos));render()}
+  function addTodo(){const inp=document.getElementById('todoInput');const v=inp.value.trim();if(!v) return;todos.push({text:v,done:false});inp.value='';saveTodos()}
+  render();
+
+  // —— 日历打卡（存日期） ——
+  const daysEl=document.getElementById('days');
+  let marks=JSON.parse(localStorage.getItem('marks')||'[]');
+  function markDay(){const val=document.getElementById('datePick').value;if(!val) return; if(!marks.includes(val)) marks.push(val); localStorage.setItem('marks',JSON.stringify(marks));showMarks()}
+  function showMarks(){daysEl.textContent = marks.length? '已打卡：'+marks.join('、') : '尚无打卡'}
+  showMarks();
+
+  // —— 倒计时 ——
+  let target=null,downTimer=null;const leftEl=document.getElementById('left'),doneEl=document.getElementById('done');
+  function setTarget(){const v=document.getElementById('dt').value;if(!v) return;target=new Date(v);doneEl.style.display='none';downTimer&&clearInterval(downTimer);downTimer=setInterval(()=>{const diff=target-new Date();if(diff<=0){leftEl.textContent='00:00:00';doneEl.style.display='block';navigator.vibrate&&navigator.vibrate([90,90,120]);clearInterval(downTimer)}else{const s=Math.floor(diff/1000);const h=Math.floor(s/3600).toString().padStart(2,'0');const m=Math.floor(s%3600/60).toString().padStart(2,'0');const ss=(s%60).toString().padStart(2,'0');leftEl.textContent=`${h}:${m}:${ss}`}},1000)}
+</script></body>
+</html>
