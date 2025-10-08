@@ -267,6 +267,51 @@ document.addEventListener('visibilitychange', ()=>{
     }
   }
 });
+    {
+  "todos": [
+    {
+      "id": "20251008-001",
+      "title": "复习团课讲稿",
+      "content": "明天培训要讲的，别忘了改好PPT",
+      "date": "2025-10-09",
+      "remindTime": "08:00",
+      "done": false
+    },
+    ...
+  ]
+    }
+    function addTodo() {
+  const title = document.getElementById("todoTitle").value;
+  const content = document.getElementById("todoContent").value;
+  const date = document.getElementById("todoDate").value;
+  const remindTime = document.getElementById("todoRemind").value;
+
+  const newTodo = {
+    id: Date.now().toString(),
+    title,
+    content,
+    date,
+    remindTime,
+    done: false
+  };
+
+  saveTodoToFirebase(newTodo); // 存到云端
+}
+    function renderTodos(todos) {
+  const list = document.getElementById("todoList");
+  list.innerHTML = "";
+  todos.forEach(todo => {
+    const item = document.createElement("div");
+    item.innerHTML = `
+      <p><b>${todo.title}</b> (${todo.date} ${todo.remindTime})</p>
+      <p>${todo.content}</p>
+      <button onclick="toggleDone('${todo.id}')">
+        ${todo.done ? "✅ 已完成" : "📌 待完成"}
+      </button>
+    `;
+    list.appendChild(item);
+  });
+}
 </script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -364,6 +409,16 @@ document.addEventListener('visibilitychange', ()=>{
   </div>
   <ul id="todoList" class="list"></ul>
 </div>
+    <div class="card">
+  <b>待办事项 + 打卡提醒</b>
+  <input id="todoTitle" placeholder="标题，如：复习讲稿">
+  <textarea id="todoContent" placeholder="备注内容，如：改好ppt发承哥"></textarea>
+  <input type="date" id="todoDate">
+  <input type="time" id="todoRemind">
+  <button class="btn btn-pink" onclick="addTodo()">➕ 添加</button>
+</div>
+    <div id="todoList"></div>
+    
 <!-- 奖励 / 惩罚清单（云同步） -->
 <div class="card">
   <b>奖励 / 惩罚清单</b>
@@ -448,6 +503,7 @@ document.addEventListener('visibilitychange', ()=>{
 </script></body>
 
 </html>
+
 
 
 
